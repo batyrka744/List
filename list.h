@@ -10,9 +10,12 @@ struct List {
     ListElem_t* data;
     int* next;
     int* prev;
+
     int head;
     int tail;
     size_t size, capacity;
+
+    int free_list;
 };
 
 #ifdef STACK_DEBUG
@@ -87,4 +90,4 @@ const char* ErrCode(errors err);
 
 errors ListDelete(List* list, int num_of_delete);
 
-errors FreeMemory(List* list);
+void FreeMemory(List* list);

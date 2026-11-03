@@ -91,3 +91,5 @@ const char* ErrCode(errors err);
 errors ListDelete(List* list, int num_of_delete);
 
 void FreeMemory(List* list);
+
+errors ListResize(List* list, size_t new_capacity);

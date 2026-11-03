@@ -8,17 +8,9 @@ int main() {
     ListInit(&list, 15);
     PrintfList(&list);
 
-    for (size_t i = 1; i < 10; i++) {
+    for (size_t i = 1; i < 20; i++) 
         ListAdd(&list, list.head, i*10);
-    }
-
-    // for (size_t i = 0; i < list.capacity; i++) {
-    //     printf("%lg ", list.data[i]);
-    // }
-    // printf("\n");
-    // for (size_t i = 0; i < list.capacity; i++) {
-    //     printf("%d ", list.next[i]);
-    // }
+    
     PrintfList(&list);
 
     ListAdd(&list, 3, 35);
@@ -42,7 +34,7 @@ errors PrintfList(List* list) {
         printf("%lg ", list->data[current]);
         current = list->next[current]; 
     }
-    printf("\n");
+    printf("\n\n");
 
 
     ASSERT_OK(list);
@@ -66,12 +58,13 @@ errors ListInit(List* list, size_t capacity ON_DBG(, const char* name, const cha
     list->next = (int*)calloc(capacity, sizeof(int));
     list->prev = (int*)calloc(capacity, sizeof(int));
 
-    if (list->data == NULL || list->next == NULL || list->prev == NULL) 
-        return ERR_NO_MEMORY;
+    my_assert(list->data != NULL, ERR_NO_MEMORY);
+    my_assert(list->next != NULL, ERR_NO_MEMORY);
+    my_assert(list->prev != NULL, ERR_NO_MEMORY);
+
 
 
     list->free_list = 1;
-
 
     for (size_t i = 1; i < capacity - 1; i++) {
         list->data[i] = POISON_DATA;
@@ -81,33 +74,9 @@ errors ListInit(List* list, size_t capacity ON_DBG(, const char* name, const cha
     list->data[list->capacity - 1] = POISON_DATA;
     list->prev[capacity - 1] = FREE_CELL;
 
-    // for (size_t i = 0; i < list->capacity; i++) {
-    //     printf("%lg ", list->data[i]);
-    // }
-    // printf("\n");
-    // for (size_t i = 0; i < list->capacity; i++) {
-    //     printf("%d ", list->next[i]);
-    // }
-    // printf("\n");
-    // for (size_t i = 0; i < list->capacity; i++) {
-    //     printf("%d ", list->prev[i]);
-    // }
-    
-        
-
-    if (list->data == NULL) 
-        return ERR_NO_MEMORY;
-    
-    //stk->real_data[0] = canary;
-
-    //stk->data = stk->real_data + 1;
     list->next[0] = 0;
     list->prev[0] = 0;
     list->data[0] = POISON_DATA;
-
-    //stk->real_data[capacity + 1] = canary;
-
-    
 
     #ifdef STACK_DEBUG
     stk->file = file;
@@ -115,8 +84,8 @@ errors ListInit(List* list, size_t capacity ON_DBG(, const char* name, const cha
     stk->line = line;
     #endif 
 
-    ASSERT_OK(list);
 
+    ASSERT_OK(list);
     return ERR_OK;
 }
 
@@ -124,17 +93,12 @@ errors ListAdd(List* list, int num_prev_elem, ListElem_t value) {
 
     ASSERT_OK(list);
 
+    if (list->size == list->capacity - 1) 
+        ListResize(list, 2*list->capacity + 1);
+    
+
     int free_index = list->free_list;
     list->free_list = list->next[list->free_list];
-
-    // for (size_t i = 1; i < list->capacity; i++) {
-    //     if (list->next[i] == FREE_CELL) {
-    //         list->data[i] = value;
-    //         free_index = i;
-    //         break;
-    //     }
-    // }
-    // my_assert(free_index != -1, ERR_OVERFLOW);
 
     list->next[free_index] = list->next[num_prev_elem];
     list->prev[free_index] = num_prev_elem;
@@ -163,9 +127,10 @@ errors ListDelete(List* list, int num_of_delete) {
     my_assert(num_of_delete <= list->capacity, ERR_ARR_CANARY);
     my_assert(num_of_delete != 0, ERR_ARR_CANARY);
 
+    if (list->size < (list->capacity) / 4 && list->capacity > 4)
+        ListResize(list, list->capacity / 2);
 
     list->next[list->prev[num_of_delete]] = list->next[num_of_delete];
-
     list->prev[list->next[num_of_delete]] = list->prev[num_of_delete];
 
 
@@ -179,7 +144,7 @@ errors ListDelete(List* list, int num_of_delete) {
     list->prev[num_of_delete] = FREE_CELL;
     list->data[num_of_delete] = POISON_DATA;
 
-    
+
     list->size--;
 
     ASSERT_OK(list);
@@ -225,9 +190,6 @@ void ListDump(const List* list,  errors err_code, const char* file, int line, co
     PrintTop(list, err_code, file, line, func);
 
     PrintBottom(list);
-
-    //StackDump_file(list, err_code, file, line, func);
-
 }
 
 void PrintTop(const List* list, errors err_code, const char* file, int line, const char* func) {
@@ -315,4 +277,41 @@ void FreeMemory(List* list) {
     free(list->data);
     free(list->next);
     free(list->prev);
+}
+
+errors ListResize(List* list, size_t new_capacity) {
+
+    ASSERT_OK(list);    
+
+    int old_capacity = list->capacity;
+
+    ListElem_t* temp_data = (ListElem_t*)realloc(list->data, (new_capacity)*sizeof(ListElem_t));
+    int* temp_next = (int*)realloc(list->next, (new_capacity)*sizeof(int));
+    int* temp_prev = (int*)realloc(list->prev, (new_capacity)*sizeof(int));
+
+    my_assert(temp_data != NULL, ERR_NO_MEMORY);
+    my_assert(temp_next != NULL, ERR_NO_MEMORY);
+    my_assert(temp_prev != NULL, ERR_NO_MEMORY);
+
+    list->data = temp_data;
+    list->next = temp_next;
+    list->prev = temp_prev;
+    
+    list->capacity = new_capacity;
+
+    for (size_t i = old_capacity; old_capacity < new_capacity && i < new_capacity - 1; i++) {
+        list->data[i] = POISON_DATA;
+        list->next[i] = (int)(i + 1);
+        list->prev[i] = FREE_CELL;
+    }
+
+    list->data[list->capacity - 1] = POISON_DATA;
+    list->prev[list->capacity - 1] = FREE_CELL;
+    list->next[list->capacity - 1] = list->free_list;
+
+    list->free_list = list->next[old_capacity];
+
+    ASSERT_OK(list);
+
+    return ERR_OK;
 }
